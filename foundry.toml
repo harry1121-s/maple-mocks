@@ -1,0 +1,30 @@
+[profile.default]
+contracts       = 'contracts'             # The source directory
+test            = 'tests'                 # The test directory
+libs            = ['modules']             # A list of library directories
+optimizer       = true                   # Enable or disable the solc optimizer
+optimizer_runs  = 8000                    # The number of optimizer runs
+verbosity       = 3                       # The verbosity of tests
+block_timestamp = 1_685_721_539           # Timestamp for tests (non-zero)
+gas_limit       = "18446744073709551615"  # Gas limit for tests
+gas_reports = ["*"]
+auto_detect_solc = true
+
+[profile.production]
+optimizer = true
+
+[fuzz]
+runs = 100
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "thousands"
+override_spacing = true
+wrap_comments = false
+ignore = []
+

@@ -1,0 +1,4 @@
+{
+    "filter_paths": "modules|script|test|coverage",
+    "solc_remaps": "@openzeppelin/=node_modules/@"
+}
