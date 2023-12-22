@@ -309,6 +309,7 @@ contract Pool is ERC20 {
         ( redeemableShares_, assets_ ) = processExit(shares_, owner_);
         console.log("BURN se phle");
         _burn(redeemableShares_, assets_, receiver_, owner_, msg.sender);
+        depositAmount -= assets_;
     }
 
     // function withdraw(uint256 assets_, address receiver_, address owner_)
@@ -499,7 +500,7 @@ contract Pool is ERC20 {
     // }
 
     function totalAssets() public view returns (uint256 totalAssets_) {
-        totalAssets_ = ERC20(asset).balanceOf(address(this));
+        totalAssets_ = depositAmount;
         totalAssets_ += ((totalAssets_ * (block.timestamp - startTime) * interest) / 1e17);
 
     }
