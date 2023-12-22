@@ -1,0 +1,17 @@
+# Compiler files
+cache
+forge-cache/
+out/
+.env
+
+docs/
+coverage/
+braodcast/
+lcov.info
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+.DS_Store
