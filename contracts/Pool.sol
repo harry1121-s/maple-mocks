@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import { ERC20 }       from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20Upgradeable } from "@openzeppelin-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import { Initializable } from "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { IERC20, IPool }    from "./interfaces/IPool.sol";
 import { IERC20Helper } from "./interfaces/IERC20Helper.sol";
+
 
 /*
 
@@ -16,7 +18,7 @@ import { IERC20Helper } from "./interfaces/IERC20Helper.sol";
 
 */
 
-contract Pool is ERC20 {
+contract Pool is Initializable, ERC20Upgradeable {
 
     event ConfigurationUpdated(
         uint256 indexed configId_,
@@ -34,7 +36,7 @@ contract Pool is ERC20 {
     }
     uint256 public liquidityCap;
     uint256 public depositAmount;
-    uint256 public latestConfigId = 2;
+    uint256 public latestConfigId;
     mapping(address => uint256) public exitCycleId;
     mapping(address => uint256) public lockedShares;
     mapping(uint256 => CycleConfig) public cycleConfigs;
@@ -49,29 +51,26 @@ contract Pool is ERC20 {
     address public asset;    // Underlying ERC-20 asset handled by the ERC-4626 contract.
     // address public manager;  // Address of the contract that manages administrative functionality.
     uint256 startTime;
-    uint256 interest = 158_548_961;
-    uint256 private _locked = 1;  // Used when checking for reentrancy.
+    uint256 interest;
+    uint256 private _locked;  // Used when checking for reentrancy.
 
-    constructor(
-        // address manager_,
+    function initialize(
         address asset_,
-        // address destination_,
-        // uint256 bootstrapMint_,
-        // uint256 initialSupply_,
         string memory name_,
         string memory symbol_
-    )
-        ERC20(name_, symbol_)
-    {
-        // require((manager = manager_) != address(0), "P:C:ZERO_MANAGER");
+    ) external initializer
+    {   
+        __ERC20_init(name_, symbol_);
+
         require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
         liquidityCap = 1e9*1e6;
-        decimal = ERC20(asset).decimals();
+        decimal = ERC20Upgradeable(asset).decimals();
+        latestConfigId = 2;
         cycleConfigs[latestConfigId] = CycleConfig({
             initialCycleId:   _uint64(24),
             initialCycleTime: _uint64(1683831600),
-            cycleDuration:    _uint64(86400),
-            windowDuration:   _uint64(54000)
+            cycleDuration:    _uint64(86400), //change to 2 mins
+            windowDuration:   _uint64(54000) //change to 1 mins
         });
 
         emit ConfigurationUpdated({
@@ -81,6 +80,10 @@ contract Pool is ERC20 {
             cycleDuration_:    _uint64(86400),
             windowDuration_:   _uint64(54000)
         });
+
+        interest = 158_548_961;
+        _locked = 1;
+
     }
 
     function decimals() public view virtual override returns (uint8) {
@@ -120,7 +123,6 @@ contract Pool is ERC20 {
 
      function getCurrentCycleId() public view returns (uint256 cycleId_) {
         CycleConfig memory config_ = getCurrentConfig();
-
         cycleId_ = config_.initialCycleId + (block.timestamp - config_.initialCycleTime) / config_.cycleDuration;
     }
 
@@ -182,14 +184,12 @@ contract Pool is ERC20 {
 
         // Move all shares (including any new ones) to the new cycle.
         exitCycleId_ = getCurrentCycleId() + 2;
+
         totalCycleShares[exitCycleId_] += lockedShares_;
 
         exitCycleId[owner_]  = exitCycleId_;
         lockedShares[owner_] = lockedShares_;
 
-        // ERC20(address(this)).transferFrom(msg.sender, address(this), shares_);
-
-        // _emitUpdate(owner_, lockedShares_, exitCycleId_);
     }
 
     function getWindowAtId(uint256 cycleId_) public view returns (uint256 windowStart_, uint256 windowEnd_) {
@@ -252,21 +252,7 @@ contract Pool is ERC20 {
         lockedShares[owner_] = lockedShares_;
         exitCycleId[owner_]  = exitCycleId_;
 
-        // _emitProcess(owner_, redeemableShares_, resultingAssets_);
-        // _emitUpdate(owner_, lockedShares_, exitCycleId_);
     }
-
-    /**************************************************************************************************************************************/
-    /*** Modifiers                                                                                                                      ***/
-    /**************************************************************************************************************************************/
-
-    // modifier checkCall(bytes32 functionId_) {
-    //     ( bool success_, string memory errorMessage_ ) = IPoolManagerLike(manager).canCall(functionId_, msg.sender, msg.data[4:]);
-
-    //     require(success_, errorMessage_);
-
-    //     _;
-    // }
 
     modifier nonReentrant() {
         require(_locked == 1, "P:LOCKED");
@@ -288,10 +274,6 @@ contract Pool is ERC20 {
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
-    // function mint(uint256 shares_, address receiver_) external override nonReentrant checkCall("P:mint") returns (uint256 assets_) {
-    //     _mint(shares_, assets_ = previewMint(shares_), receiver_, msg.sender);
-    // }
-
     function redeem(uint256 shares_, address receiver_, address owner_)
         external nonReentrant returns (uint256 assets_)
     {
@@ -303,28 +285,6 @@ contract Pool is ERC20 {
         _burn(redeemableShares_, assets_, receiver_, owner_, msg.sender);
     }
 
-    // function withdraw(uint256 assets_, address receiver_, address owner_)
-    //     external override nonReentrant checkCall("P:withdraw") returns (uint256 shares_)
-    // {
-    //     ( shares_, assets_ ) = IPoolManagerLike(manager).processWithdraw(assets_, owner_, msg.sender);
-    //     _burn(shares_, assets_, receiver_, owner_, msg.sender);
-    // }
-
-    // /**************************************************************************************************************************************/
-    // /*** Withdrawal Request Functions                                                                                                   ***/
-    // /**************************************************************************************************************************************/
-
-    // function removeShares(uint256 shares_, address owner_)
-    //     external override nonReentrant checkCall("P:removeShares") returns (uint256 sharesReturned_)
-    // {
-    //     if (msg.sender != owner_) _decreaseAllowance(owner_, msg.sender, shares_);
-
-    //     emit SharesRemoved(
-    //         owner_,
-    //         sharesReturned_ = IPoolManagerLike(manager).removeShares(shares_, owner_)
-    //     );
-    // }
-
     function requestRedeem(uint256 shares_, address owner_)
         external nonReentrant returns (uint256 escrowedShares_)
     {
@@ -334,16 +294,6 @@ contract Pool is ERC20 {
         escrowedShares_ = _requestRedeem(shares_, owner_);
         // );
     }
-
-    // function requestWithdraw(uint256 assets_, address owner_)
-    //     external override nonReentrant checkCall("P:requestWithdraw") returns (uint256 escrowedShares_)
-    // {
-    //     emit WithdrawRequested(
-    //         owner_,
-    //         assets_,
-    //         escrowedShares_ = _requestWithdraw(assets_, owner_)
-    //     );
-    // }
 
     // /**************************************************************************************************************************************/
     // /*** Internal Functions                                                                                                             ***/
@@ -361,7 +311,7 @@ contract Pool is ERC20 {
 
         // emit Withdraw(caller_, receiver_, owner_, assets_, shares_);
         IERC20Helper(asset).mint(address(this), assets_- depositAmount);
-        ERC20(asset).transfer(receiver_, assets_);
+        ERC20Upgradeable(asset).transfer(receiver_, assets_);
         depositAmount = 0;
         // require(ERC20Helper.transfer(asset, receiver_, assets_), "P:B:TRANSFER");
     }
@@ -379,7 +329,7 @@ contract Pool is ERC20 {
 
         // emit Deposit(caller_, receiver_, assets_, shares_);
 
-        ERC20(asset).transferFrom(caller_, address(this), assets_);
+        ERC20Upgradeable(asset).transferFrom(caller_, address(this), assets_);
         depositAmount += assets_;
 
     }
@@ -389,69 +339,14 @@ contract Pool is ERC20 {
 
         ( escrowShares_, destination_ ) = (shares_, address(this));
 
-        // if (msg.sender != owner_) {
-        //     _decreaseAllowance(owner_, msg.sender, escrowShares_);
-        // }
-
+    
         if (escrowShares_ != 0 && destination_ != address(0)) {
             _transfer(owner_, destination_, escrowShares_);
         }
+
         addShares(escrowShares_, owner_);
-
-        // IPoolManagerLike(manager).requestRedeem(escrowShares_, owner_, msg.sender);
+     
     }
-
-    // function _requestWithdraw(uint256 assets_, address owner_) internal returns (uint256 escrowShares_) {
-    //     address destination_;
-
-    //     ( escrowShares_, destination_ ) = IPoolManagerLike(manager).getEscrowParams(owner_, convertToExitShares(assets_));
-
-    //     if (msg.sender != owner_) {
-    //         _decreaseAllowance(owner_, msg.sender, escrowShares_);
-    //     }
-
-    //     if (escrowShares_ != 0 && destination_ != address(0)) {
-    //         _transfer(owner_, destination_, escrowShares_);
-    //     }
-
-    //     IPoolManagerLike(manager).requestWithdraw(escrowShares_, assets_, owner_, msg.sender);
-    // }
-
-    // /**************************************************************************************************************************************/
-    // /*** External View Functions                                                                                                        ***/
-    // /**************************************************************************************************************************************/
-
-    // function balanceOfAssets(address account_) external view override returns (uint256 balanceOfAssets_) {
-    //     balanceOfAssets_ = convertToAssets(balanceOf[account_]);
-    // }
-
-    // function maxDeposit(address receiver_) external view override returns (uint256 maxAssets_) {
-    //     maxAssets_ = IPoolManagerLike(manager).maxDeposit(receiver_);
-    // }
-
-    // function maxMint(address receiver_) external view override returns (uint256 maxShares_) {
-    //     maxShares_ = IPoolManagerLike(manager).maxMint(receiver_);
-    // }
-
-    // function maxRedeem(address owner_) external view override returns (uint256 maxShares_) {
-    //     maxShares_ = IPoolManagerLike(manager).maxRedeem(owner_);
-    // }
-
-    // function maxWithdraw(address owner_) external view override returns (uint256 maxAssets_) {
-    //     maxAssets_ = IPoolManagerLike(manager).maxWithdraw(owner_);
-    // }
-
-    // function previewRedeem(uint256 shares_) external view override returns (uint256 assets_) {
-    //     assets_ = IPoolManagerLike(manager).previewRedeem(msg.sender, shares_);
-    // }
-
-    // function previewWithdraw(uint256 assets_) external view override returns (uint256 shares_) {
-    //     shares_ = IPoolManagerLike(manager).previewWithdraw(msg.sender, assets_);
-    // }
-
-    // /**************************************************************************************************************************************/
-    // /*** Public View Functions                                                                                                          ***/
-    // /**************************************************************************************************************************************/
 
     function convertToAssets(uint256 shares_) public view returns (uint256 assets_) {
         uint256 totalSupply_ = totalSupply();
@@ -481,23 +376,12 @@ contract Pool is ERC20 {
         shares_ = convertToShares(assets_);
     }
 
-    // function previewMint(uint256 shares_) public view override returns (uint256 assets_) {
-    //     uint256 totalSupply_ = totalSupply;
-
-    //     // As per https://eips.ethereum.org/EIPS/eip-4626#security-considerations,
-    //     // it should round UP if it’s calculating the amount of assets a user must provide, to be issued a given amount of shares.
-    //     assets_ = totalSupply_ == 0 ? shares_ : _divRoundUp(shares_ * totalAssets(), totalSupply_);
-    // }
 
     function totalAssets() public view returns (uint256 totalAssets_) {
         totalAssets_ = depositAmount;
         totalAssets_ += ((totalAssets_ * (block.timestamp - startTime) * interest) / 1e17);
 
     }
-
-    // function unrealizedLosses() public view override returns (uint256 unrealizedLosses_) {
-    //     unrealizedLosses_ = IPoolManagerLike(manager).unrealizedLosses();
-    // }
 
     function _uint64(uint256 input_) internal pure returns (uint64 output_) {
         require(input_ <= type(uint64).max, "WM:UINT64_CAST_OOB");

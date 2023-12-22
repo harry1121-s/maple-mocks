@@ -1,8 +1,14 @@
 pragma solidity 0.8.21;
 
 import { Test, console } from "forge-std/Test.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Pool } from "../contracts/Pool.sol";
 import { MockToken } from "../contracts/MockToken.sol";
+import { ProxyAdmin } from "../contracts/upgradeable/ProxyAdmin.sol";
+import {
+    TransparentUpgradeableProxy,
+    ITransparentUpgradeableProxy
+} from "../contracts/upgradeable/TransparentUpgradeableProxy.sol";
 
 contract testPool is Test {
 
@@ -10,15 +16,23 @@ contract testPool is Test {
     address public user1 = vm.addr(456);
     address public user2 = vm.addr(789);
 
+    Pool public poolImplementation;
     Pool public pool;
     MockToken public token;
+
+    ProxyAdmin public proxyAdmin;
+    TransparentUpgradeableProxy public poolProxy;
 
 
     function setUp() public {
 
         vm.startPrank(owner);
         token = new MockToken("TEST USDC", "TUSDC", 6);
-        pool = new Pool(address(token), "TUSDC CASH POOL", "TSUDC_CP");
+        proxyAdmin = new ProxyAdmin(owner);
+        poolImplementation = new Pool();
+        bytes memory data = abi.encodeCall(poolImplementation.initialize, (address(token), "TUSDC CASH POOL", "TSUDC_CP"));
+        poolProxy = new TransparentUpgradeableProxy(address(poolImplementation), address(proxyAdmin), data);
+        pool = Pool(address(poolProxy));
         vm.stopPrank();
 
     }
