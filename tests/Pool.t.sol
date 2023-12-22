@@ -2,7 +2,7 @@ pragma solidity 0.8.21;
 
 import { Test, console } from "forge-std/Test.sol";
 import { Pool } from "../contracts/Pool.sol";
-import { myToken } from "../contracts/MyToken.sol";
+import { MockToken } from "../contracts/MockToken.sol";
 
 contract testPool is Test {
 
@@ -11,13 +11,13 @@ contract testPool is Test {
     address public user2 = vm.addr(789);
 
     Pool public pool;
-    myToken public token;
+    MockToken public token;
 
 
     function setUp() public {
 
         vm.startPrank(owner);
-        token = new myToken("TEST USDC", "TUSDC");
+        token = new MockToken("TEST USDC", "TUSDC", 6);
         pool = new Pool(address(token), "TUSDC CASH POOL", "TSUDC_CP");
         vm.stopPrank();
 
@@ -138,6 +138,8 @@ contract testPool is Test {
         token.approve(address(pool), 1e12);
         pool.deposit(1e12, user1); //deposit 
         vm.stopPrank();
+
+        vm.warp(block.timestamp + 365 days);
 
         vm.startPrank(user1);
         pool.approve(address(pool), 1e12);

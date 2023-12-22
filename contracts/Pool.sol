@@ -2,10 +2,8 @@
 pragma solidity 0.8.21;
 
 import { ERC20 }       from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-// import { ERC20Helper } from "../modules/erc20-helper/src/ERC20Helper.sol";
-import { Test, console } from "forge-std/Test.sol";
-import { IPoolManagerLike } from "./interfaces/Interfaces.sol";
 import { IERC20, IPool }    from "./interfaces/IPool.sol";
+import { IERC20Helper } from "./interfaces/IERC20Helper.sol";
 
 /*
 
@@ -198,22 +196,11 @@ contract Pool is ERC20 {
         public view returns (uint256 redeemableShares_, uint256 resultingAssets_, bool partialLiquidity_)
     {
         // IPoolManagerLike poolManager_ = IPoolManagerLike(poolManager);
-
-        // Calculate how much liquidity is available, and how much is required to allow redemption of shares.
-        uint256 availableLiquidity_      = ERC20(asset).balanceOf(address(this));
-        uint256 totalAssetsWithLosses_   = totalAssets();
-        uint256 totalSupply_             = totalSupply();
-        uint256 totalRequestedLiquidity_ = totalCycleShares[exitCycleId[owner_]] * totalAssetsWithLosses_ / totalSupply_;
-
-        partialLiquidity_ = availableLiquidity_ < totalRequestedLiquidity_;
-
-        // Calculate maximum redeemable shares while maintaining a pro-rata distribution.
-        redeemableShares_ =
-            partialLiquidity_
-                ? lockedShares_ * availableLiquidity_ / totalRequestedLiquidity_
-                : lockedShares_;
-
-        resultingAssets_ = redeemableShares_ * totalAssetsWithLosses_ / totalSupply_;
+       
+        redeemableShares_ = lockedShares_;
+        partialLiquidity_ = false;
+        // uint256 interest = totalAssets()-depositAmount;
+        resultingAssets_ = totalAssets();
     }
 
 
@@ -289,9 +276,8 @@ contract Pool is ERC20 {
     // /**************************************************************************************************************************************/
 
     function deposit(uint256 assets_, address receiver_) external nonReentrant returns (uint256 shares_) {
-        if(totalSupply() == 0){
-            startTime = block.timestamp;
-        }
+        
+        startTime = block.timestamp;
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
@@ -307,9 +293,7 @@ contract Pool is ERC20 {
 
         // ( redeemableShares_, assets_ ) = IPoolManagerLike(manager).processRedeem(shares_, owner_, msg.sender);
         ( redeemableShares_, assets_ ) = processExit(shares_, owner_);
-        console.log("BURN se phle");
         _burn(redeemableShares_, assets_, receiver_, owner_, msg.sender);
-        depositAmount -= assets_;
     }
 
     // function withdraw(uint256 assets_, address receiver_, address owner_)
@@ -366,13 +350,11 @@ contract Pool is ERC20 {
         // if (caller_ != owner_) {
         //     _decreaseAllowance(owner_, caller_, shares_);
         // }
-        console.log("BURN fat rha h");
         _burn(address(this), shares_);
 
         // emit Withdraw(caller_, receiver_, owner_, assets_, shares_);
-        console.log("YHN tk chal gya");
+        IERC20Helper(asset).mint(address(this), assets_- depositAmount);
         ERC20(asset).transfer(receiver_, assets_);
-        console.log("YHN tk bhi chal gya");
         // require(ERC20Helper.transfer(asset, receiver_, assets_), "P:B:TRANSFER");
     }
 

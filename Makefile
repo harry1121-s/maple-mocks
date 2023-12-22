@@ -27,6 +27,10 @@ testToken:
 testLoanManager:
 	@forge test --match-path ./tests/unit/LoanManager.t.sol -vvv --gas-report
 
+deploy:
+	source .env && \
+	forge script script/DeployTokens.s.sol:DeployTokens --rpc-url $$GOERLI_RPC_URL --broadcast --verify -vvvv
+
 clean:
 	@forge clean && \
 	rm -rf coverage && \
