@@ -45,6 +45,7 @@ contract Pool is ERC20 {
 
     uint256 public immutable BOOTSTRAP_MINT;
 
+    uint8 public decimal;
     address public asset;    // Underlying ERC-20 asset handled by the ERC-4626 contract.
     // address public manager;  // Address of the contract that manages administrative functionality.
     uint256 startTime;
@@ -65,6 +66,7 @@ contract Pool is ERC20 {
         // require((manager = manager_) != address(0), "P:C:ZERO_MANAGER");
         require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
         liquidityCap = 1e9*1e6;
+        decimal = ERC20(asset).decimals();
         cycleConfigs[latestConfigId] = CycleConfig({
             initialCycleId:   _uint64(24),
             initialCycleTime: _uint64(1683831600),
@@ -79,6 +81,10 @@ contract Pool is ERC20 {
             cycleDuration_:    _uint64(86400),
             windowDuration_:   _uint64(54000)
         });
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        return decimal;
     }
 
     /**************************************************************************************************************************************/
