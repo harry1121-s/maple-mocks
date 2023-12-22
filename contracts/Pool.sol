@@ -362,6 +362,7 @@ contract Pool is ERC20 {
         // emit Withdraw(caller_, receiver_, owner_, assets_, shares_);
         IERC20Helper(asset).mint(address(this), assets_- depositAmount);
         ERC20(asset).transfer(receiver_, assets_);
+        depositAmount = 0;
         // require(ERC20Helper.transfer(asset, receiver_, assets_), "P:B:TRANSFER");
     }
 
