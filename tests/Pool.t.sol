@@ -161,6 +161,7 @@ contract testPool is Test {
 
         (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
 
+        console.log(block.timestamp, windowStart, windowStop);
         vm.warp(windowStart + 10);
 
         vm.startPrank(user1);

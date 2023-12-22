@@ -68,17 +68,17 @@ contract Pool is Initializable, ERC20Upgradeable {
         latestConfigId = 2;
         cycleConfigs[latestConfigId] = CycleConfig({
             initialCycleId:   _uint64(24),
-            initialCycleTime: _uint64(1683831600),
-            cycleDuration:    _uint64(86400), //change to 2 mins
-            windowDuration:   _uint64(54000) //change to 1 mins
+            initialCycleTime: _uint64(block.timestamp),
+            cycleDuration:    _uint64(120), //change to 2 mins
+            windowDuration:   _uint64(60) //change to 1 mins
         });
 
         emit ConfigurationUpdated({
             configId_:         latestConfigId,
             initialCycleId_:   _uint64(24),
-            initialCycleTime_: _uint64(1683831600),
-            cycleDuration_:    _uint64(86400),
-            windowDuration_:   _uint64(54000)
+            initialCycleTime_: _uint64(block.timestamp),
+            cycleDuration_:    _uint64(120),
+            windowDuration_:   _uint64(60)
         });
 
         interest = 158_548_961;
