@@ -359,9 +359,9 @@ contract Pool is ERC20 {
         // require(ERC20Helper.transfer(asset, receiver_, assets_), "P:B:TRANSFER");
     }
 
-    // function _divRoundUp(uint256 numerator_, uint256 divisor_) internal pure returns (uint256 result_) {
-    //     result_ = (numerator_ + divisor_ - 1) / divisor_;
-    // }
+    function _divRoundUp(uint256 numerator_, uint256 divisor_) internal pure returns (uint256 result_) {
+        result_ = (numerator_ + divisor_ - 1) / divisor_;
+    }
 
     function _mint(uint256 shares_, uint256 assets_, address receiver_, address caller_) internal {
         require(receiver_ != address(0), "P:M:ZERO_RECEIVER");
@@ -446,17 +446,17 @@ contract Pool is ERC20 {
     // /*** Public View Functions                                                                                                          ***/
     // /**************************************************************************************************************************************/
 
-    // function convertToAssets(uint256 shares_) public view override returns (uint256 assets_) {
-    //     uint256 totalSupply_ = totalSupply;
+    function convertToAssets(uint256 shares_) public view returns (uint256 assets_) {
+        uint256 totalSupply_ = totalSupply();
 
-    //     assets_ = totalSupply_ == 0 ? shares_ : (shares_ * totalAssets()) / totalSupply_;
-    // }
+        assets_ = totalSupply_ == 0 ? shares_ : (shares_ * totalAssets()) / totalSupply_;
+    }
 
-    // function convertToExitAssets(uint256 shares_) public view override returns (uint256 assets_) {
-    //     uint256 totalSupply_ = totalSupply;
+    function convertToExitAssets(uint256 shares_) public view returns (uint256 assets_) {
+        uint256 totalSupply_ = totalSupply();
 
-    //     assets_ = totalSupply_ == 0 ? shares_ : shares_ * (totalAssets() - unrealizedLosses()) / totalSupply_;
-    // }
+        assets_ = totalSupply_ == 0 ? shares_ : shares_ * totalAssets() / totalSupply_;
+    }
 
     function convertToShares(uint256 assets_) public view returns (uint256 shares_) {
         uint256 totalSupply_ = totalSupply();
@@ -464,9 +464,9 @@ contract Pool is ERC20 {
         shares_ = totalSupply_ == 0 ? assets_ : (assets_ * totalSupply_) / totalAssets();
     }
 
-    // function convertToExitShares(uint256 amount_) public view override returns (uint256 shares_) {
-    //     shares_ = _divRoundUp(amount_ * totalSupply, totalAssets() - unrealizedLosses());
-    // }
+    function convertToExitShares(uint256 amount_) public view returns (uint256 shares_) {
+        shares_ = _divRoundUp(amount_ * totalSupply(), totalAssets());
+    }
 
     function previewDeposit(uint256 assets_) public view returns (uint256 shares_) {
         // As per https://eips.ethereum.org/EIPS/eip-4626#security-considerations,
