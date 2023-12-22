@@ -3,7 +3,7 @@ pragma solidity 0.8.21;
 
 import { ERC20 }       from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 // import { ERC20Helper } from "../modules/erc20-helper/src/ERC20Helper.sol";
-
+import { Test, console } from "forge-std/Test.sol";
 import { IPoolManagerLike } from "./interfaces/Interfaces.sol";
 import { IERC20, IPool }    from "./interfaces/IPool.sol";
 
@@ -307,7 +307,7 @@ contract Pool is ERC20 {
 
         // ( redeemableShares_, assets_ ) = IPoolManagerLike(manager).processRedeem(shares_, owner_, msg.sender);
         ( redeemableShares_, assets_ ) = processExit(shares_, owner_);
-
+        console.log("BURN se phle");
         _burn(redeemableShares_, assets_, receiver_, owner_, msg.sender);
     }
 
@@ -365,11 +365,13 @@ contract Pool is ERC20 {
         // if (caller_ != owner_) {
         //     _decreaseAllowance(owner_, caller_, shares_);
         // }
-
-        _burn(owner_, shares_);
+        console.log("BURN fat rha h");
+        _burn(address(this), shares_);
 
         // emit Withdraw(caller_, receiver_, owner_, assets_, shares_);
+        console.log("YHN tk chal gya");
         ERC20(asset).transfer(receiver_, assets_);
+        console.log("YHN tk bhi chal gya");
         // require(ERC20Helper.transfer(asset, receiver_, assets_), "P:B:TRANSFER");
     }
 
