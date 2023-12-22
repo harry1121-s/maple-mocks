@@ -32,7 +32,7 @@ contract Pool is ERC20 {
         uint64 cycleDuration;     // Duration of the withdrawal cycle.
         uint64 windowDuration;    // Duration of the withdrawal window.
     }
-
+    uint256 public liquidityCap;
     uint256 public depositAmount;
     uint256 public latestConfigId = 2;
     mapping(address => uint256) public exitCycleId;
@@ -64,6 +64,7 @@ contract Pool is ERC20 {
     {
         // require((manager = manager_) != address(0), "P:C:ZERO_MANAGER");
         require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
+        liquidityCap = 1e9*1e6;
         cycleConfigs[latestConfigId] = CycleConfig({
             initialCycleId:   _uint64(24),
             initialCycleTime: _uint64(1683831600),
