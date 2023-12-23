@@ -53,38 +53,41 @@ contract Pool is Initializable, ERC20Upgradeable {
     uint256 startTime;
     uint256 interest;
     uint256 private _locked;  // Used when checking for reentrancy.
-
-    function initialize(
-        address asset_,
-        string memory name_,
-        string memory symbol_
-    ) external initializer
-    {   
-        __ERC20_init(name_, symbol_);
-
-        require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
-        liquidityCap = 1e9*1e6;
-        decimal = ERC20Upgradeable(asset).decimals();
-        latestConfigId = 2;
-        cycleConfigs[latestConfigId] = CycleConfig({
-            initialCycleId:   _uint64(24),
-            initialCycleTime: _uint64(block.timestamp),
-            cycleDuration:    _uint64(120), //change to 2 mins
-            windowDuration:   _uint64(60) //change to 1 mins
-        });
-
-        emit ConfigurationUpdated({
-            configId_:         latestConfigId,
-            initialCycleId_:   _uint64(24),
-            initialCycleTime_: _uint64(block.timestamp),
-            cycleDuration_:    _uint64(120),
-            windowDuration_:   _uint64(60)
-        });
-
-        interest = 158_548_961;
-        _locked = 1;
-
+    uint64 public ver;
+    function initialize(uint64 version_) external reinitializer(version_){
+        ver = version_;
     }
+    // function initialize(
+    //     address asset_,
+    //     string memory name_,
+    //     string memory symbol_
+    // ) external initializer
+    // {   
+    //     __ERC20_init(name_, symbol_);
+
+    //     require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
+    //     liquidityCap = 1e9*1e6;
+    //     decimal = ERC20Upgradeable(asset).decimals();
+    //     latestConfigId = 2;
+    //     cycleConfigs[latestConfigId] = CycleConfig({
+    //         initialCycleId:   _uint64(24),
+    //         initialCycleTime: _uint64(block.timestamp),
+    //         cycleDuration:    _uint64(120), //change to 2 mins
+    //         windowDuration:   _uint64(60) //change to 1 mins
+    //     });
+
+    //     emit ConfigurationUpdated({
+    //         configId_:         latestConfigId,
+    //         initialCycleId_:   _uint64(24),
+    //         initialCycleTime_: _uint64(block.timestamp),
+    //         cycleDuration_:    _uint64(120),
+    //         windowDuration_:   _uint64(60)
+    //     });
+
+    //     interest = 158_548_961;
+    //     _locked = 1;
+
+    // }
 
     function decimals() public view virtual override returns (uint8) {
         return decimal;
@@ -295,10 +298,44 @@ contract Pool is Initializable, ERC20Upgradeable {
         // );
     }
 
+   function removeShares(uint256 shares_, address owner_)
+        external nonReentrant returns (uint256 sharesReturned_)
+    {
+
+        sharesReturned_ = _removeShares(shares_, owner_);
+    }
+
     // /**************************************************************************************************************************************/
     // /*** Internal Functions                                                                                                             ***/
     // /**************************************************************************************************************************************/
 
+    function _removeShares(uint256 shares_, address owner_) internal returns(uint256 sharesRemoved_) {
+        uint256 exitCycleId_  = exitCycleId[owner_];
+        uint256 lockedShares_ = lockedShares[owner_];
+
+        require(block.timestamp >= getWindowStart(exitCycleId_), "WM:RS:WITHDRAWAL_PENDING");
+        require(shares_ != 0 && shares_ <= lockedShares_,        "WM:RS:SHARES_OOB");
+
+        // Remove shares from old the cycle.
+        totalCycleShares[exitCycleId_] -= lockedShares_;
+
+        // Calculate remaining shares and new cycle (if applicable).
+        lockedShares_ -= shares_;
+        exitCycleId_   = lockedShares_ != 0 ? getCurrentCycleId() + 2 : 0;
+
+        // Add shares to new cycle (if applicable).
+        if (lockedShares_ != 0) {
+            totalCycleShares[exitCycleId_] += lockedShares_;
+        }
+
+        // Update the withdrawal request.
+        exitCycleId[owner_]  = exitCycleId_;
+        lockedShares[owner_] = lockedShares_;
+
+        sharesRemoved_ = shares_;
+
+        _transfer(address(this), owner_, shares_);
+    }
     function _burn(uint256 shares_, uint256 assets_, address receiver_, address owner_, address caller_) internal {
         require(receiver_ != address(0), "P:B:ZERO_RECEIVER");
 
