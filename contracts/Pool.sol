@@ -305,6 +305,19 @@ contract Pool is Initializable, ERC20Upgradeable {
         sharesReturned_ = _removeShares(shares_, owner_);
     }
 
+    function requestIds(address user_) returns (uint256 Id_){
+        Id_ = 0;
+    }
+
+    function requests(uint256 reqId_) returns (address user_, uint256 shares_) {
+        user_ = msg.sender;
+        shares_ = lockedShares[msg.sender];
+    }
+
+    function manualSharesAvailable(address user_) returns (uint256 shares_) {
+        shares_ = lockedShares[msg.sender];
+    }
+
     // /**************************************************************************************************************************************/
     // /*** Internal Functions                                                                                                             ***/
     // /**************************************************************************************************************************************/
