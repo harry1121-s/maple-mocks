@@ -85,37 +85,37 @@ contract Pool is Initializable, ERC20Upgradeable {
 
         _locked = 1;
     }
-    function initialize(
-        address asset_,
-        string memory name_,
-        string memory symbol_
-    ) external initializer
-    {   
-        __ERC20_init(name_, symbol_);
+    // function initialize(
+    //     address asset_,
+    //     string memory name_,
+    //     string memory symbol_
+    // ) external initializer
+    // {   
+    //     __ERC20_init(name_, symbol_);
 
-        require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
-        liquidityCap = 1e9*1e6;
-        decimal = ERC20Upgradeable(asset).decimals();
-        latestConfigId = 2;
-        cycleConfigs[latestConfigId] = CycleConfig({
-            initialCycleId:   _uint64(24),
-            initialCycleTime: _uint64(block.timestamp),
-            cycleDuration:    _uint64(120), //change to 2 mins
-            windowDuration:   _uint64(60) //change to 1 mins
-        });
+    //     require((asset   = asset_)   != address(0), "P:C:ZERO_ASSET");
+    //     liquidityCap = 1e9*1e6;
+    //     decimal = ERC20Upgradeable(asset).decimals();
+    //     latestConfigId = 2;
+    //     cycleConfigs[latestConfigId] = CycleConfig({
+    //         initialCycleId:   _uint64(24),
+    //         initialCycleTime: _uint64(block.timestamp),
+    //         cycleDuration:    _uint64(120), //change to 2 mins
+    //         windowDuration:   _uint64(60) //change to 1 mins
+    //     });
 
-        emit ConfigurationUpdated({
-            configId_:         latestConfigId,
-            initialCycleId_:   _uint64(24),
-            initialCycleTime_: _uint64(block.timestamp),
-            cycleDuration_:    _uint64(120),
-            windowDuration_:   _uint64(60)
-        });
+    //     emit ConfigurationUpdated({
+    //         configId_:         latestConfigId,
+    //         initialCycleId_:   _uint64(24),
+    //         initialCycleTime_: _uint64(block.timestamp),
+    //         cycleDuration_:    _uint64(120),
+    //         windowDuration_:   _uint64(60)
+    //     });
 
-        interest = 158_548_961;
-        _locked = 1;
+    //     interest = 158_548_961;
+    //     _locked = 1;
 
-    }
+    // }
 
     function decimals() public view virtual override returns (uint8) {
         return decimal;
