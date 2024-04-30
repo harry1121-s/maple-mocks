@@ -53,10 +53,38 @@ contract Pool is Initializable, ERC20Upgradeable {
     uint256 startTime;
     uint256 interest;
     uint256 private _locked;  // Used when checking for reentrancy.
-    // uint64 public ver;
-    // function initialize(uint64 version_) external reinitializer(version_){
-    //     ver = version_;
-    // }
+    
+    struct WithdrawalRequest {
+        address owner;
+        uint256 shares;
+    }
+    struct Queue {
+        uint128 nextRequestId;  // Identifier of the next request that will be processed.
+        uint128 lastRequestId;  // Identifier of the last created request.
+        mapping(uint128 => WithdrawalRequest) requests;  // Maps withdrawal requests to their positions in the queue.
+    }
+
+
+    uint256 public totalShares;  // Total amount of shares pending redemption.
+
+    Queue public queue;
+
+    mapping(address => bool) public isManualWithdrawal;  // Defines which users use automated withdrawals (false by default).
+
+    mapping(address => uint128) public requestIds;  // Maps users to their withdrawal requests identifiers.
+
+    mapping(address => uint256) public manualSharesAvailable;  // Shares available to withdraw for a given manual owner.
+
+
+    modifier nonReentrant() {
+        require(_locked == 1, "P:LOCKED");
+
+        _locked = 2;
+
+        _;
+
+        _locked = 1;
+    }
     function initialize(
         address asset_,
         string memory name_,
@@ -173,35 +201,23 @@ contract Pool is Initializable, ERC20Upgradeable {
 
     function addShares(uint256 shares_, address owner_) internal {
 
-        uint256 exitCycleId_  = exitCycleId[owner_];
-        uint256 lockedShares_ = lockedShares[owner_];
+        require(shares_ > 0,             "WM:AS:ZERO_SHARES");
+        require(requestIds[owner_] == 0, "WM:AS:IN_QUEUE");
 
-        require(lockedShares_ == 0 || block.timestamp >= getWindowStart(exitCycleId_), "WM:AS:WITHDRAWAL_PENDING");
+        uint128 lastRequestId_ = ++queue.lastRequestId;
 
-        // Remove all existing shares from the current cycle.
-        totalCycleShares[exitCycleId_] -= lockedShares_;
+        queue.requests[lastRequestId_] = WithdrawalRequest(owner_, shares_);
 
-        lockedShares_ += shares_;
+        requestIds[owner_] = lastRequestId_;
 
-        require(lockedShares_ != 0, "WM:AS:NO_OP");
+        // Increase the number of shares locked.
+        totalShares += shares_;
 
-        // Move all shares (including any new ones) to the new cycle.
-        exitCycleId_ = getCurrentCycleId() + 2;
-
-        totalCycleShares[exitCycleId_] += lockedShares_;
-
-        exitCycleId[owner_]  = exitCycleId_;
-        lockedShares[owner_] = lockedShares_;
+        require(transferFrom(msg.sender, address(this), shares_), "WM:AS:FAILED_TRANSFER");
 
     }
 
-    function getWindowAtId(uint256 cycleId_) public view returns (uint256 windowStart_, uint256 windowEnd_) {
-        CycleConfig memory config_ = getConfigAtId(cycleId_);
-
-        windowStart_ = config_.initialCycleTime + (cycleId_ - config_.initialCycleId) * config_.cycleDuration;
-        windowEnd_   = windowStart_ + config_.windowDuration;
-    }
-
+    
     function getRedeemableAmounts(uint256 lockedShares_, address owner_)
         public view returns (uint256 redeemableShares_, uint256 resultingAssets_, bool partialLiquidity_)
     {
@@ -214,58 +230,138 @@ contract Pool is Initializable, ERC20Upgradeable {
     }
 
 
-     function processExit(uint256 requestedShares_, address owner_)
-        internal returns (uint256 redeemableShares_, uint256 resultingAssets_)
-    {
+    function processRedemptions(uint256 maxSharesToProcess_) external nonReentrant {
+        require(maxSharesToProcess_ > 0, "WM:PR:ZERO_SHARES");
 
-        uint256 exitCycleId_  = exitCycleId[owner_];
-        uint256 lockedShares_ = lockedShares[owner_];
+        ( uint256 redeemableShares_, ) = _calculateRedemption(maxSharesToProcess_);
 
-        require(lockedShares_ != 0, "WM:PE:NO_REQUEST");
+        // Revert if there are insufficient assets to redeem all shares.
+        require(maxSharesToProcess_ == redeemableShares_, "WM:PR:LOW_LIQUIDITY");
 
-        require(requestedShares_ == lockedShares_, "WM:PE:INVALID_SHARES");
+        uint128 nextRequestId_ = queue.nextRequestId;
+        uint128 lastRequestId_ = queue.lastRequestId;
 
-        bool partialLiquidity_;
+        // Iterate through the loop and process as many requests as possible.
+        // Stop iterating when there are no more shares to process or if you have reached the end of the queue.
+        while (maxSharesToProcess_ > 0 && nextRequestId_ <= lastRequestId_) {
+            ( uint256 sharesProcessed_, bool isProcessed_ ) = _processRequest(nextRequestId_, maxSharesToProcess_);
 
-        ( uint256 windowStart_, uint256 windowEnd_ ) = getWindowAtId(exitCycleId_);
+            // If the request has not been processed keep it at the start of the queue.
+            // This request will be next in line to be processed on the next call.
+            if (!isProcessed_) break;
 
-        require(block.timestamp >= windowStart_ && block.timestamp <  windowEnd_, "WM:PE:NOT_IN_WINDOW");
+            maxSharesToProcess_ -= sharesProcessed_;
 
-        ( redeemableShares_, resultingAssets_, partialLiquidity_ ) = getRedeemableAmounts(lockedShares_, owner_);
-
-        // Transfer redeemable shares to be burned in the pool, re-lock remaining shares.
-        // require(ERC20Helper.transfer(pool, owner_, redeemableShares_), "WM:PE:TRANSFER_FAIL");
-
-        // Reduce totalCurrentShares by the shares that were used in the old cycle.
-        totalCycleShares[exitCycleId_] -= lockedShares_;
-
-        // Reduce the locked shares by the total amount transferred back to the LP.
-        lockedShares_ -= redeemableShares_;
-
-        // If there are any remaining shares, move them to the next cycle.
-        // In case of partial liquidity move shares only one cycle forward (instead of two).
-        if (lockedShares_ != 0) {
-            exitCycleId_ = getCurrentCycleId() + (partialLiquidity_ ? 1 : 2);
-            totalCycleShares[exitCycleId_] += lockedShares_;
-        } else {
-            exitCycleId_ = 0;
+            ++nextRequestId_;
         }
 
-        // Update the locked shares and cycle for the account, setting to zero if no shares are remaining.
-        lockedShares[owner_] = lockedShares_;
-        exitCycleId[owner_]  = exitCycleId_;
-
+        // Adjust the new start of the queue.
+        queue.nextRequestId = nextRequestId_;
+    }
+    function processExit(
+        uint256 shares_,
+        address owner_
+    )
+        public returns (
+            uint256 redeemableShares_,
+            uint256 resultingAssets_
+        )
+    {
+        ( redeemableShares_, resultingAssets_ ) = owner_ == address(this)
+            ? _calculateRedemption(shares_)
+            : _processManualExit(shares_, owner_);
     }
 
-    modifier nonReentrant() {
-        require(_locked == 1, "P:LOCKED");
+    function _calculateRedemption(uint256 sharesToRedeem_) internal view returns (uint256 redeemableShares_, uint256 resultingAssets_) {
 
-        _locked = 2;
+        uint256 totalSupply_           = totalSupply();
+        uint256 totalAssetsWithLosses_ = totalAssets();
+        uint256 availableLiquidity_    = IERC20(asset).balanceOf(address(this));
+        uint256 requiredLiquidity_     = totalAssetsWithLosses_ * sharesToRedeem_ / totalSupply_;
 
-        _;
+        bool partialLiquidity_ = availableLiquidity_ < requiredLiquidity_;
 
-        _locked = 1;
+        redeemableShares_ = partialLiquidity_ ? sharesToRedeem_ * availableLiquidity_ / requiredLiquidity_ : sharesToRedeem_;
+        resultingAssets_  = totalAssetsWithLosses_ * redeemableShares_  / totalSupply_;
     }
+
+    function _processManualExit(
+        uint256 shares_,
+        address owner_
+    )
+        internal returns (
+            uint256 redeemableShares_,
+            uint256 resultingAssets_
+        )
+    {
+        require(shares_ > 0,                              "WM:PE:NO_SHARES");
+        require(shares_ <= manualSharesAvailable[owner_], "WM:PE:TOO_MANY_SHARES");
+
+        ( redeemableShares_ , resultingAssets_ ) = _calculateRedemption(shares_);
+
+        require(shares_ == redeemableShares_, "WM:PE:NOT_ENOUGH_LIQUIDITY");
+
+        manualSharesAvailable[owner_] -= redeemableShares_;
+
+
+        // Unlock the reserved shares.
+        totalShares -= redeemableShares_;
+
+        require(transfer(owner_, redeemableShares_), "WM:PE:TRANSFER_FAIL");
+    }
+
+    function _min(uint256 a_, uint256 b_) internal pure returns (uint256 min_) {
+        min_ = a_ < b_ ? a_ : b_;
+    }
+
+    function _processRequest(
+        uint128 requestId_,
+        uint256 maximumSharesToProcess_
+    )
+        internal returns (
+            uint256 processedShares_,
+            bool    isProcessed_
+        )
+    {
+        WithdrawalRequest memory request_ = queue.requests[requestId_];
+
+        // If the request has already been cancelled, skip it.
+        if (request_.owner == address(0)) return (0, true);
+
+        // Process only up to the maximum amount of shares.
+        uint256 sharesToProcess_ = _min(request_.shares, maximumSharesToProcess_);
+
+        // Calculate how many shares can actually be redeemed.
+        uint256 resultingAssets_;
+
+        ( processedShares_, resultingAssets_ ) = _calculateRedemption(sharesToProcess_);
+
+        // If there are no remaining shares, request has been fully processed.
+        isProcessed_ = (request_.shares - processedShares_) == 0;
+
+
+        // If the request has been fully processed, remove it from the queue.
+        if (isProcessed_) {
+            // _removeRequest(request_.owner, requestId_);
+        } else {
+            // Update the withdrawal request.
+            queue.requests[requestId_].shares = request_.shares - processedShares_;
+
+        }
+
+        // If the owner opts for manual redemption, increase the account's available shares.
+        if (isManualWithdrawal[request_.owner]) {
+            manualSharesAvailable[request_.owner] += processedShares_;
+
+        } else {
+            // Otherwise, just adjust totalShares and perform the redeem.
+            totalShares -= processedShares_;
+
+            redeem(processedShares_, request_.owner, address(this));
+        }
+    }
+
+   
 
     // /**************************************************************************************************************************************/
     // /*** LP Functions                                                                                                                   ***/
@@ -278,7 +374,7 @@ contract Pool is Initializable, ERC20Upgradeable {
     }
 
     function redeem(uint256 shares_, address receiver_, address owner_)
-        external nonReentrant returns (uint256 assets_)
+        public nonReentrant returns (uint256 assets_)
     {
         uint256 redeemableShares_;
         require(owner_ == msg.sender, "PM:PR:NOT_OWNER");
@@ -305,16 +401,8 @@ contract Pool is Initializable, ERC20Upgradeable {
         sharesReturned_ = _removeShares(shares_, owner_);
     }
 
-    function requestIds(address user_) external view returns (uint256 Id_){
-        Id_ = 0;
-    }
-
     function requests(uint256 reqId_) external view returns (address user_, uint256 shares_) {
         user_ = msg.sender;
-        shares_ = lockedShares[msg.sender];
-    }
-
-    function manualSharesAvailable(address user_) external view returns (uint256 shares_) {
         shares_ = lockedShares[msg.sender];
     }
 

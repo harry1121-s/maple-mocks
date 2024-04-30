@@ -113,111 +113,111 @@ contract testPool is Test {
         console.log(block.timestamp, pool.getWindowStart(pool.exitCycleId(user1)));
     }
 
-    function test_redeem_fail() external {
-        vm.prank(owner);
-        token.mint(user1, 1e6*1e6);
-        assertEq(token.balanceOf(user1), 1e6*1e6);
+    // function test_redeem_fail() external {
+    //     vm.prank(owner);
+    //     token.mint(user1, 1e6*1e6);
+    //     assertEq(token.balanceOf(user1), 1e6*1e6);
 
-        vm.startPrank(user1);
-        token.approve(address(pool), 1e12);
-        pool.deposit(1e12, user1); //deposit 
-        vm.stopPrank();
+    //     vm.startPrank(user1);
+    //     token.approve(address(pool), 1e12);
+    //     pool.deposit(1e12, user1); //deposit 
+    //     vm.stopPrank();
 
-        vm.startPrank(user1);
-        pool.approve(address(pool), 1e12);
-        pool.requestRedeem(1e12, user1); //request redeem 
+    //     vm.startPrank(user1);
+    //     pool.approve(address(pool), 1e12);
+    //     pool.requestRedeem(1e12, user1); //request redeem 
 
-        vm.startPrank(user1);
-        vm.expectRevert("WM:PE:NOT_IN_WINDOW");
-        pool.redeem(1e12, user1, user1);
-        vm.stopPrank();
+    //     vm.startPrank(user1);
+    //     vm.expectRevert("WM:PE:NOT_IN_WINDOW");
+    //     pool.redeem(1e12, user1, user1);
+    //     vm.stopPrank();
 
-        (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
+    //     (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
 
-        vm.warp(windowStop + 1);
+    //     vm.warp(windowStop + 1);
 
-        vm.startPrank(user1);
-        vm.expectRevert("WM:PE:NOT_IN_WINDOW");
-        pool.redeem(1e12, user1, user1);
-        vm.stopPrank();
+    //     vm.startPrank(user1);
+    //     vm.expectRevert("WM:PE:NOT_IN_WINDOW");
+    //     pool.redeem(1e12, user1, user1);
+    //     vm.stopPrank();
 
-    }
+    // }
 
-    function test_redeem_pass() external {
-        vm.prank(owner);
-        token.mint(user1, 1e6*1e6);
-        assertEq(token.balanceOf(user1), 1e6*1e6);
+    // function test_redeem_pass() external {
+    //     vm.prank(owner);
+    //     token.mint(user1, 1e6*1e6);
+    //     assertEq(token.balanceOf(user1), 1e6*1e6);
 
-        vm.startPrank(user1);
-        token.approve(address(pool), 1e12);
-        pool.deposit(1e12, user1); //deposit 
-        vm.stopPrank();
+    //     vm.startPrank(user1);
+    //     token.approve(address(pool), 1e12);
+    //     pool.deposit(1e12, user1); //deposit 
+    //     vm.stopPrank();
 
-        vm.warp(block.timestamp + 365 days);
+    //     vm.warp(block.timestamp + 365 days);
 
-        vm.startPrank(user1);
-        pool.approve(address(pool), 1e12);
-        pool.requestRedeem(1e12, user1); //request redeem 
+    //     vm.startPrank(user1);
+    //     pool.approve(address(pool), 1e12);
+    //     pool.requestRedeem(1e12, user1); //request redeem 
 
-        (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
+    //     (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
 
-        console.log(block.timestamp, windowStart, windowStop);
-        vm.warp(windowStart + 10);
+    //     console.log(block.timestamp, windowStart, windowStop);
+    //     vm.warp(windowStart + 10);
 
-        vm.startPrank(user1);
-        pool.redeem(1e12, user1, user1);
-        vm.stopPrank();
-    }
+    //     vm.startPrank(user1);
+    //     pool.redeem(1e12, user1, user1);
+    //     vm.stopPrank();
+    // }
 
-    function test_redeem_missedWindow() external {
-        vm.prank(owner);
-        token.mint(user1, 1e6*1e6);
-        assertEq(token.balanceOf(user1), 1e6*1e6);
+    // function test_redeem_missedWindow() external {
+    //     vm.prank(owner);
+    //     token.mint(user1, 1e6*1e6);
+    //     assertEq(token.balanceOf(user1), 1e6*1e6);
 
-        vm.startPrank(user1);
-        token.approve(address(pool), 1e12);
-        pool.deposit(1e12, user1); //deposit 
-        vm.stopPrank();
+    //     vm.startPrank(user1);
+    //     token.approve(address(pool), 1e12);
+    //     pool.deposit(1e12, user1); //deposit 
+    //     vm.stopPrank();
 
-        vm.warp(block.timestamp + 365 days);
+    //     vm.warp(block.timestamp + 365 days);
 
-        vm.startPrank(user1);
-        pool.approve(address(pool), 1e12);
-        pool.requestRedeem(1e12, user1); //request redeem 
+    //     vm.startPrank(user1);
+    //     pool.approve(address(pool), 1e12);
+    //     pool.requestRedeem(1e12, user1); //request redeem 
 
-        (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
+    //     (uint256 windowStart, uint256 windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
 
-        console.log(block.timestamp, windowStart, windowStop);
-        vm.warp(windowStop + 10);
+    //     console.log(block.timestamp, windowStart, windowStop);
+    //     vm.warp(windowStop + 10);
 
-        vm.startPrank(user1);
-        vm.expectRevert("WM:PE:NOT_IN_WINDOW");
-        pool.redeem(1e12, user1, user1);
-        vm.stopPrank();
-        assertEq(pool.balanceOf(address(pool)), 1e12);
+    //     vm.startPrank(user1);
+    //     vm.expectRevert("WM:PE:NOT_IN_WINDOW");
+    //     pool.redeem(1e12, user1, user1);
+    //     vm.stopPrank();
+    //     assertEq(pool.balanceOf(address(pool)), 1e12);
 
-        vm.prank(user1);
-        uint256 sharesReturned = pool.removeShares(1e12, user1);
-        assertEq(sharesReturned, 1e12);
-        assertEq(pool.balanceOf(address(pool)), 0);
-        assertEq(pool.balanceOf(user1), 1e12);
+    //     vm.prank(user1);
+    //     uint256 sharesReturned = pool.removeShares(1e12, user1);
+    //     assertEq(sharesReturned, 1e12);
+    //     assertEq(pool.balanceOf(address(pool)), 0);
+    //     assertEq(pool.balanceOf(user1), 1e12);
 
-        vm.startPrank(user1);
-        pool.approve(address(pool), 1e12);
-        pool.requestRedeem(1e12, user1); //request redeem 
+    //     vm.startPrank(user1);
+    //     pool.approve(address(pool), 1e12);
+    //     pool.requestRedeem(1e12, user1); //request redeem 
 
-        (windowStart, windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
+    //     (windowStart, windowStop) = pool.getWindowAtId(pool.exitCycleId(user1));
 
-        console.log(block.timestamp, windowStart, windowStop);
-        vm.warp(windowStart + 10);
+    //     console.log(block.timestamp, windowStart, windowStop);
+    //     vm.warp(windowStart + 10);
 
-        vm.startPrank(user1);
-        pool.redeem(1e12, user1, user1);
-        vm.stopPrank();
-        assertEq(pool.totalSupply(), 0);
-        console.log(token.balanceOf(user1));
+    //     vm.startPrank(user1);
+    //     pool.redeem(1e12, user1, user1);
+    //     vm.stopPrank();
+    //     assertEq(pool.totalSupply(), 0);
+    //     console.log(token.balanceOf(user1));
 
 
         
-    }
+    // }
 }
